@@ -6,6 +6,13 @@ const socketIo = require('socket.io');
 
 const pool = require('./db');
 
+// Verifica la conexión a la base de datos al iniciar
+pool.query('SELECT NOW()').then(() => {
+  console.log('Conexión a la base de datos verificada');
+}).catch((err) => {
+  console.error('Error al conectar con la base de datos:', err);
+});
+
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
