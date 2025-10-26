@@ -1,10 +1,10 @@
-
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const { Pool } = require('pg');
 const http = require('http');
 const socketIo = require('socket.io');
 
+const pool = require('./db');
 
 const app = express();
 const server = http.createServer(app);
@@ -14,20 +14,13 @@ const io = socketIo(server, {
 
 console.log('Iniciando backend...');
 
-const pool = new Pool({
-  user: 'postgres',      // Cambia estos valores según tu configuración
-  host: 'localhost',
-  database: 'postgres',
-  password: 'Gante675',
-  port: 5432,
-});
-
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 
 // Exporta el pool y el io para usarlo en las rutas
 module.exports.pool = pool;
 module.exports.io = io;
+app.set('io', io);
 
 // Rutas para excel_data
 app.use('/api/excel', require('./routes/excel'));
@@ -68,7 +61,8 @@ io.on('connection', (socket) => {
 });
 
 
-server.listen(3001, () => console.log('API corriendo en puerto 3001'));
+const PORT = process.env.PORT || 3001;
+server.listen(PORT, () => console.log(`API corriendo en puerto ${PORT}`));
 
 // Log de errores globales
 process.on('uncaughtException', (err) => {
