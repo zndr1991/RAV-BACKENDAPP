@@ -43,6 +43,7 @@ app.post('/api/login', async (req, res) => {
       res.status(401).json({ ok: false, mensaje: 'Usuario o contraseña incorrectos' });
     }
   } catch (err) {
+    console.error('Error en /api/login:', err);
     res.status(500).json({ ok: false, mensaje: 'Error en el servidor' });
   }
 });
