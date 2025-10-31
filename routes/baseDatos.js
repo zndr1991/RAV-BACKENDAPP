@@ -5,6 +5,7 @@ const { pool, io } = require('../server');
 const TABLA_BASE = 'base_datos';
 const TABLA_ORDENES = 'ordenes_proveedor';
 const ESTATUS_EDITABLE_COLUMNS = new Set(['ESTATUS_LOCAL', 'ESTATUS_FORANEO', 'ESTATUS2']);
+const CAPTURA_EDITABLE_COLUMNS = new Set(['CODIGO', 'CHOFER']);
 
 const columnasFecha = [
   'FECHA_COTIZACION',
@@ -108,6 +109,46 @@ router.put('/captura/marcar-generado', async (req, res) => {
   } catch (err) {
     console.error('Error en /captura/marcar-generado:', err);
     res.status(500).json({ ok: false, mensaje: 'No se pudo actualizar los registros.' });
+  }
+});
+
+router.post('/captura/actualizar-celda', async (req, res) => {
+  const { id, field, value } = req.body || {};
+
+  const numericId = Number.isInteger(id) ? id : parseInt(id, 10);
+  if (!numericId) {
+    return res.status(400).json({ ok: false, mensaje: 'ID inválido.' });
+  }
+
+  if (!field || !CAPTURA_EDITABLE_COLUMNS.has(field)) {
+    return res.status(400).json({ ok: false, mensaje: 'Campo no permitido.' });
+  }
+
+  const nuevoValor = value === null || value === undefined ? '' : String(value).trim();
+
+  try {
+    const result = await pool.query(
+      `UPDATE ${TABLA_BASE}
+          SET "${field}" = $1
+        WHERE id = $2`,
+      [nuevoValor, numericId]
+    );
+
+    if (!result.rowCount) {
+      return res.status(404).json({ ok: false, mensaje: 'Registro no encontrado.' });
+    }
+
+    io.emit('excel_data_updated', {
+      type: 'captura_cell_update',
+      id: numericId,
+      field,
+      value: nuevoValor
+    });
+
+    res.json({ ok: true, id: numericId, field, value: nuevoValor });
+  } catch (err) {
+    console.error('Error en /captura/actualizar-celda:', err);
+    res.status(500).json({ ok: false, mensaje: 'Error al actualizar el registro.' });
   }
 });
 
