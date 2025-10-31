@@ -1,4 +1,13 @@
-require('dotenv').config();
+const fs = require('fs');
+const path = require('path');
+const dotenv = require('dotenv');
+
+const envLocalPath = path.resolve(__dirname, '.env.local');
+if (fs.existsSync(envLocalPath)) {
+  dotenv.config({ path: envLocalPath });
+} else {
+  dotenv.config();
+}
 const express = require('express');
 const cors = require('cors');
 const http = require('http');
@@ -56,6 +65,7 @@ app.post('/api/login', async (req, res) => {
 });
 
 app.use('/api/basedatos', require('./routes/baseDatos'));
+app.use('/api/nuevo-estatus', require('./routes/nuevoEstatus'));
 
 const localidadesRouter = require('./routes/localidades');
 app.use('/api/localidades', localidadesRouter);

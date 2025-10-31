@@ -19,13 +19,16 @@ const parseConfig = () => {
 
   const url = new URL(process.env.DATABASE_URL);
 
+  const host = url.hostname;
+  const useSSL = !['localhost', '127.0.0.1', '::1'].includes(host);
+
   return {
-    host: url.hostname,
+    host,
     port: Number(url.port) || 5432,
     database: url.pathname.slice(1),
     user: decodeURIComponent(url.username),
     password: decodeURIComponent(url.password),
-    ssl: { rejectUnauthorized: false },
+    ssl: useSSL ? { rejectUnauthorized: false } : false,
     keepAlive: true,
     connectionTimeoutMillis: 10000,
     idleTimeoutMillis: 30000,
