@@ -3,21 +3,16 @@ const router = express.Router();
 const pool = require('../server').pool;
 const io = require('../server').io;
 
-// Convierte serial de Excel a string dd/mm/yyyy hh:mm:ss
+// Convierte serial de Excel a string dd/mm/yyyy hh:mm:ss sin desfases por zona horaria
 function excelDateToString(serial) {
-  if (typeof serial !== 'number') return serial;
-  const utc_days = Math.floor(serial - 25569);
-  const utc_value = utc_days * 86400;
-  const date_info = new Date(utc_value * 1000);
-  const fractional_day = serial - Math.floor(serial);
-  let total_seconds = Math.round(86400 * fractional_day);
-  const seconds = total_seconds % 60;
-  total_seconds -= seconds;
-  const hours = Math.floor(total_seconds / (60 * 60));
-  const minutes = Math.floor((total_seconds - (hours * 60 * 60)) / 60);
-  date_info.setHours(hours, minutes, seconds);
-  const pad = n => n.toString().padStart(2, '0');
-  return `${pad(date_info.getDate())}/${pad(date_info.getMonth() + 1)}/${date_info.getFullYear()} ${pad(date_info.getHours())}:${pad(date_info.getMinutes())}:${pad(date_info.getSeconds())}`;
+  if (typeof serial !== 'number' || Number.isNaN(serial)) return serial;
+
+  const milliseconds = Math.round((serial - 25569) * 86400 * 1000);
+  const date = new Date(milliseconds);
+  if (Number.isNaN(date.getTime())) return '';
+
+  const pad = (value) => value.toString().padStart(2, '0');
+  return `${pad(date.getUTCDate())}/${pad(date.getUTCMonth() + 1)}/${date.getUTCFullYear()} ${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}:${pad(date.getUTCSeconds())}`;
 }
 
 const columnasFecha = [

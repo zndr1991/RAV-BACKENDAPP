@@ -49,18 +49,14 @@ const columnasFecha = [
 ];
 
 const excelDateToString = (serial) => {
-  if (typeof serial !== 'number') return serial;
-  const utcDays = Math.floor(serial - 25569);
-  const date = new Date(utcDays * 86400 * 1000);
-  const fractionalDay = serial - Math.floor(serial);
-  let totalSeconds = Math.round(fractionalDay * 86400);
-  const seconds = totalSeconds % 60;
-  totalSeconds = (totalSeconds - seconds) / 60;
-  const minutes = totalSeconds % 60;
-  const hours = (totalSeconds - minutes) / 60;
-  date.setHours(hours, minutes, seconds, 0);
+  if (typeof serial !== 'number' || Number.isNaN(serial)) return serial;
+
+  const milliseconds = Math.round((serial - 25569) * 86400 * 1000);
+  const date = new Date(milliseconds);
+  if (Number.isNaN(date.getTime())) return '';
+
   const pad = (value) => value.toString().padStart(2, '0');
-  return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+  return `${pad(date.getUTCDate())}/${pad(date.getUTCMonth() + 1)}/${date.getUTCFullYear()} ${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}:${pad(date.getUTCSeconds())}`;
 };
 
 const parseFechaDDMMYYYY = (valor) => {
