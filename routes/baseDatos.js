@@ -256,6 +256,30 @@ router.put('/actualizar-estatus', async (req, res) => {
   }
 });
 
+router.post('/asignar-localidades', async (_req, res) => {
+  try {
+    const result = await pool.query(
+      `UPDATE ${TABLA_BASE} AS b
+          SET "LOCALIDAD" = LOWER(TRIM(l.localidad))
+        FROM localidades AS l
+       WHERE COALESCE(TRIM(b."LOCALIDAD"), '') = ''
+         AND COALESCE(TRIM(l.localidad), '') <> ''
+         AND UPPER(TRIM(COALESCE(b."NOMBRE_COMERCIAL_TALLER", ''))) = UPPER(TRIM(COALESCE(l.taller, '')))
+      RETURNING b.id`
+    );
+
+    const updated = result.rowCount || 0;
+    if (updated) {
+      io.emit('excel_data_updated', { type: 'localidad_autofill', updated });
+    }
+
+    res.json({ ok: true, updated });
+  } catch (err) {
+    console.error('Error al asignar localidades automáticamente:', err);
+    res.status(500).json({ ok: false, mensaje: 'No se pudieron asignar las localidades automáticamente.' });
+  }
+});
+
 // -------- ORDENES PROVEEDOR --------
 
 router.get('/ordenes-proveedor/obtener', async (req, res) => {
