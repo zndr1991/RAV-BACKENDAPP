@@ -5,7 +5,7 @@ const { pool, io } = require('../server');
 const TABLA_BASE = 'base_datos';
 const TABLA_ORDENES = 'ordenes_proveedor';
 const ESTATUS_EDITABLE_COLUMNS = new Set(['ESTATUS_LOCAL', 'ESTATUS_FORANEO', 'ESTATUS2', 'LOCALIDAD', 'NUEVO_ESTATUS']);
-const CAPTURA_EDITABLE_COLUMNS = new Set(['CODIGO', 'CHOFER', 'COMPAQ']);
+const CAPTURA_EDITABLE_COLUMNS = new Set(['CODIGO', 'CHOFER', 'COSTO', 'COMPAQ']);
 
 const columnasFecha = [
   'FECHA_COTIZACION',
