@@ -5,7 +5,7 @@ const { pool, io } = require('../server');
 const TABLA_BASE = 'base_datos';
 const TABLA_ORDENES = 'ordenes_proveedor';
 const ESTATUS_EDITABLE_COLUMNS = new Set(['ESTATUS_LOCAL', 'ESTATUS_FORANEO', 'ESTATUS2', 'LOCALIDAD', 'NUEVO_ESTATUS']);
-const CAPTURA_EDITABLE_COLUMNS = new Set(['CODIGO', 'CHOFER']);
+const CAPTURA_EDITABLE_COLUMNS = new Set(['CODIGO', 'CHOFER', 'COMPAQ']);
 
 const columnasFecha = [
   'FECHA_COTIZACION',
@@ -124,7 +124,16 @@ router.post('/captura/actualizar-celda', async (req, res) => {
     return res.status(400).json({ ok: false, mensaje: 'Campo no permitido.' });
   }
 
-  const nuevoValor = value === null || value === undefined ? '' : String(value).trim();
+  const rawValue = value === null || value === undefined ? '' : String(value).trim();
+  let nuevoValor = rawValue;
+
+  if (field === 'COMPAQ') {
+    const upperValue = rawValue.toUpperCase();
+    if (!['GENERADO', 'GENERAR'].includes(upperValue)) {
+      return res.status(400).json({ ok: false, mensaje: 'Valor COMPAQ no permitido.' });
+    }
+    nuevoValor = upperValue;
+  }
 
   try {
     const result = await pool.query(
