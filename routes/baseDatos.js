@@ -1,4 +1,6 @@
 const express = require('express');
+const fs = require('fs');
+const path = require('path');
 const router = express.Router();
 const { pool, io } = require('../server');
 
@@ -6,6 +8,66 @@ const TABLA_BASE = 'base_datos';
 const TABLA_ORDENES = 'ordenes_proveedor';
 const ESTATUS_EDITABLE_COLUMNS = new Set(['ESTATUS_LOCAL', 'ESTATUS_FORANEO', 'ESTATUS2', 'LOCALIDAD', 'NUEVO_ESTATUS']);
 const CAPTURA_EDITABLE_COLUMNS = new Set(['CODIGO', 'CHOFER', 'COSTO', 'COMPAQ']);
+
+const CAPTURA_LAST_INBOUND_FILE = path.resolve(__dirname, '..', 'captura_last_inbound.json');
+const CAPTURA_HISTORY_LIMIT = 3;
+let capturaLastInboundTimestamp = null;
+let capturaLastInboundHistory = [];
+
+const normalizeTimestamp = (value) => {
+  if (typeof value !== 'string') return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+};
+
+const loadCapturaLastInboundTimestamp = () => {
+  try {
+    if (!fs.existsSync(CAPTURA_LAST_INBOUND_FILE)) return;
+    const raw = fs.readFileSync(CAPTURA_LAST_INBOUND_FILE, 'utf8');
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    const rawHistory = Array.isArray(parsed?.history) ? parsed.history : [];
+    capturaLastInboundHistory = rawHistory
+      .map(normalizeTimestamp)
+      .filter(Boolean)
+      .slice(0, CAPTURA_HISTORY_LIMIT);
+    const lastInbound = normalizeTimestamp(parsed?.lastInboundAt);
+    capturaLastInboundTimestamp = lastInbound
+      || (capturaLastInboundHistory.length ? capturaLastInboundHistory[0] : null);
+  } catch (err) {
+    console.warn('No se pudo cargar la última inserción para captura:', err);
+  }
+};
+
+const persistCapturaLastInboundTimestamp = async () => {
+  try {
+    await fs.promises.writeFile(
+      CAPTURA_LAST_INBOUND_FILE,
+      JSON.stringify({
+        lastInboundAt: capturaLastInboundTimestamp,
+        history: capturaLastInboundHistory
+      }),
+      'utf8'
+    );
+  } catch (err) {
+    console.warn('No se pudo guardar la última inserción para captura:', err);
+  }
+};
+
+const registerCapturaInbound = async () => {
+  const timestamp = new Date().toISOString();
+  capturaLastInboundHistory = [timestamp, ...capturaLastInboundHistory]
+    .slice(0, CAPTURA_HISTORY_LIMIT);
+  capturaLastInboundTimestamp = capturaLastInboundHistory[0] ?? timestamp;
+  await persistCapturaLastInboundTimestamp();
+  io.emit('excel_data_updated', {
+    type: 'captura_inbound',
+    lastInboundAt: capturaLastInboundTimestamp,
+    history: capturaLastInboundHistory
+  });
+};
+
+loadCapturaLastInboundTimestamp();
 
 const columnasFecha = [
   'FECHA_COTIZACION',
@@ -84,10 +146,19 @@ router.get('/captura/generar', async (_req, res) => {
         WHERE UPPER(TRIM(COALESCE(CAST("COMPAQ" AS TEXT), ''))) = 'GENERAR'
         ORDER BY id DESC`
     );
-    res.json(result.rows || []);
+    res.json({
+      rows: result.rows || [],
+      lastInboundAt: capturaLastInboundTimestamp,
+      lastInboundHistory: capturaLastInboundHistory
+    });
   } catch (err) {
     console.error('Error en /captura/generar:', err);
-    res.status(500).json({ ok: false, mensaje: 'Error al obtener datos para captura.' });
+    res.status(500).json({
+      ok: false,
+      mensaje: 'Error al obtener datos para captura.',
+      lastInboundAt: capturaLastInboundTimestamp,
+      lastInboundHistory: capturaLastInboundHistory
+    });
   }
 });
 
@@ -165,6 +236,7 @@ router.post('/captura/actualizar-celda', async (req, res) => {
 router.post('/insertar', async (req, res) => {
   const datos = Array.isArray(req.body) ? req.body : [];
   const client = await pool.connect();
+  let insertedRows = 0;
 
   try {
     await client.query('BEGIN');
@@ -191,6 +263,7 @@ router.post('/insertar', async (req, res) => {
           `INSERT INTO ${TABLA_BASE} (${columns}) VALUES (${params})`,
           values
         );
+        insertedRows += 1;
       } catch (err) {
         console.error('Error al insertar fila en base_datos:', row, err);
       }
@@ -198,7 +271,14 @@ router.post('/insertar', async (req, res) => {
 
     await sincronizarPedidosOc(client);
     await client.query('COMMIT');
-    res.json({ ok: true });
+    if (insertedRows > 0) {
+      try {
+        await registerCapturaInbound();
+      } catch (err) {
+        console.warn('No se pudo registrar la última inserción de captura:', err);
+      }
+    }
+    res.json({ ok: true, inserted: insertedRows, lastInboundAt: capturaLastInboundTimestamp });
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('Error al insertar en base_datos:', err);
